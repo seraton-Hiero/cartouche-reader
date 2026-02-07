@@ -179,7 +179,7 @@ export default function App() {
               <h3>Candidatos</h3>
               <ul>
                 {result.name_candidates.map((c, _i) => (
-                  <li key={i}>
+                  <li key={_i}>
                     {c.name} — {Math.round(c.confidence * 100)}%
                   </li>
                 ))}
@@ -192,7 +192,7 @@ export default function App() {
               <h3>Advertencias</h3>
               <ul>
                 {result.warnings.map((w, _i) => (
-                  <li key={i}>{w}</li>
+                  <li key={_i}>{w}</li>
                 ))}
               </ul>
             </>
