@@ -60,7 +60,25 @@ export default function App() {
       }
 
       const json = await r.json();
-      setResult(json);
+
+// Normaliza para que nunca falle el render si el backend devuelve algo incompleto
+const safe = {
+  has_cartouche: Boolean(json?.has_cartouche),
+  cartouche_bbox: json?.cartouche_bbox ?? null,
+  signs: Array.isArray(json?.signs) ? json.signs : [],
+  name_candidates: Array.isArray(json?.name_candidates)
+    ? json.name_candidates
+    : [],
+  transliteration: json?.transliteration ?? null,
+  overall_confidence:
+    typeof json?.overall_confidence === "number"
+      ? json.overall_confidence
+      : 0,
+  warnings: Array.isArray(json?.warnings) ? json.warnings : [],
+};
+
+setResult(safe as any);
+
     } catch (e: any) {
       alert("Error: " + e.message);
     } finally {
