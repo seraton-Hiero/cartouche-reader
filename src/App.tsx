@@ -132,7 +132,7 @@ export default function App() {
             {result?.cartouche_bbox &&
               renderBBox(result.cartouche_bbox, "red", "Cartucho")}
 
-            {result?.signs.map((s, i) =>
+            {result?.signs.map((s, _i) =>
               renderBBox(
                 s.bbox,
                 s.gardiner_id ? "lime" : "orange",
@@ -178,7 +178,7 @@ export default function App() {
             <>
               <h3>Candidatos</h3>
               <ul>
-                {result.name_candidates.map((c, i) => (
+                {result.name_candidates.map((c, _i) => (
                   <li key={i}>
                     {c.name} — {Math.round(c.confidence * 100)}%
                   </li>
@@ -191,7 +191,7 @@ export default function App() {
             <>
               <h3>Advertencias</h3>
               <ul>
-                {result.warnings.map((w, i) => (
+                {result.warnings.map((w, _i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
