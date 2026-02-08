@@ -1,4 +1,8 @@
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+
+/* =========================
+   Tipos
+========================= */
 
 type BBox = {
   x: number;
@@ -30,11 +34,52 @@ type AnalysisResult = {
   warnings: string[];
 };
 
-export default function App() {
+/* =========================
+   Error Boundary
+========================= */
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: any }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { error };
+  }
+
+  componentDidCatch(error: any, info: any) {
+    console.error("UI crashed:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
+          <h1>💥 Error en la app</h1>
+          <pre style={{ whiteSpace: "pre-wrap" }}>
+            {String(this.state.error?.stack || this.state.error)}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
+/* =========================
+   App interna real
+========================= */
+
+function AppInner() {
   const [file, setFile] = useState<File | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
+
   const imgRef = useRef<HTMLImageElement>(null);
 
   function onSelectFile(f: File) {
@@ -45,6 +90,7 @@ export default function App() {
 
   async function analyze() {
     if (!file) return;
+
     setLoading(true);
     try {
       const fd = new FormData();
@@ -61,24 +107,23 @@ export default function App() {
 
       const json = await r.json();
 
-// Normaliza para que nunca falle el render si el backend devuelve algo incompleto
-const safe = {
-  has_cartouche: Boolean(json?.has_cartouche),
-  cartouche_bbox: json?.cartouche_bbox ?? null,
-  signs: Array.isArray(json?.signs) ? json.signs : [],
-  name_candidates: Array.isArray(json?.name_candidates)
-    ? json.name_candidates
-    : [],
-  transliteration: json?.transliteration ?? null,
-  overall_confidence:
-    typeof json?.overall_confidence === "number"
-      ? json.overall_confidence
-      : 0,
-  warnings: Array.isArray(json?.warnings) ? json.warnings : [],
-};
+      // 🔒 Normalización defensiva
+      const safe: AnalysisResult = {
+        has_cartouche: Boolean(json?.has_cartouche),
+        cartouche_bbox: json?.cartouche_bbox ?? null,
+        signs: Array.isArray(json?.signs) ? json.signs : [],
+        name_candidates: Array.isArray(json?.name_candidates)
+          ? json.name_candidates
+          : [],
+        transliteration: json?.transliteration ?? null,
+        overall_confidence:
+          typeof json?.overall_confidence === "number"
+            ? json.overall_confidence
+            : 0,
+        warnings: Array.isArray(json?.warnings) ? json.warnings : [],
+      };
 
-setResult(safe as any);
-
+      setResult(safe);
     } catch (e: any) {
       alert("Error: " + e.message);
     } finally {
@@ -134,7 +179,9 @@ setResult(safe as any);
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={(e) => e.target.files && onSelectFile(e.target.files[0])}
+        onChange={(e) =>
+          e.target.files && onSelectFile(e.target.files[0])
+        }
       />
 
       {imgUrl && (
@@ -218,5 +265,17 @@ setResult(safe as any);
         </div>
       )}
     </div>
+  );
+}
+
+/* =========================
+   Export final
+========================= */
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
