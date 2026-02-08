@@ -1,4 +1,4 @@
-const Busboy = require("busboy");
+import Busboy from "busboy";
 
 function parseMultipart(event) {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ function parseMultipart(event) {
   });
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };
@@ -62,26 +62,25 @@ exports.handler = async (event) => {
       };
     }
 
+    const model =
+      process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+
     const imageBase64 = file.buffer.toString("base64");
 
     const system =
       "Eres un asistente de visión especializado en jeroglíficos dentro de cartuchos. " +
-      "Devuelve SOLO JSON válido. No inventes: si no es identificable, usa null y explica en notes.";
+      "Devuelve SOLO JSON válido.";
 
-    const userText = `Analiza la imagen. Si hay un cartucho:
-1) Localiza el cartucho (bbox relativo 0..1).
-2) Detecta TODOS los signos dentro del cartucho (bbox relativo 0..1).
-3) Para cada signo: gardiner_id o null, confidence 0..1.
-Devuelve EXACTAMENTE:
+    const userText = `Analiza la imagen y devuelve SOLO JSON con este esquema exacto:
 
 {
  "has_cartouche": boolean,
  "cartouche_bbox": {"x":0,"y":0,"w":0,"h":0} | null,
  "signs":[
-   {"bbox":{"x":0,"y":0,"w":0,"h":0},"gardiner_id":"... "|null,"confidence":0.0,"notes":""}
+   {"bbox":{"x":0,"y":0,"w":0,"h":0},"gardiner_id":string|null,"confidence":0.0}
  ],
- "name_candidates":[{"name":"...","confidence":0.0,"notes":""}],
- "transliteration":"..."|null,
+ "name_candidates":[{"name":string,"confidence":0.0}],
+ "transliteration":string|null,
  "overall_confidence":0.0,
  "warnings":[]
 }`;
@@ -94,9 +93,7 @@ Devuelve EXACTAMENTE:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model:
-          process.env.ANTHROPIC_MODEL ||
-          "claude-3-5-sonnet-latest",
+        model,
         max_tokens: 1200,
         system,
         messages: [
@@ -132,8 +129,7 @@ Devuelve EXACTAMENTE:
 
     const data = await resp.json();
     const text =
-      data?.content?.find((c) => c.type === "text")?.text ??
-      "";
+      data?.content?.find((c) => c.type === "text")?.text ?? "";
 
     return {
       statusCode: 200,
