@@ -1,8 +1,5 @@
-import React, { useRef, useState } from "react";
-
-/* =========================
-   Tipos
-========================= */
+import { useRef, useState, useEffect } from "react";
+import { supabase } from "./lib/supabase";
 
 type BBox = {
   x: number;
@@ -34,53 +31,18 @@ type AnalysisResult = {
   warnings: string[];
 };
 
-/* =========================
-   Error Boundary
-========================= */
-
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: any }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { error: null };
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { error };
-  }
-
-  componentDidCatch(error: any, info: any) {
-    console.error("UI crashed:", error, info);
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
-          <h1>💥 Error en la app</h1>
-          <pre style={{ whiteSpace: "pre-wrap" }}>
-            {String(this.state.error?.stack || this.state.error)}
-          </pre>
-        </div>
-      );
-    }
-    return this.props.children as any;
-  }
-}
-
-/* =========================
-   App interna real
-========================= */
-
-function AppInner() {
+export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
-
   const imgRef = useRef<HTMLImageElement>(null);
+    const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+  }, []);
 
   function onSelectFile(f: File) {
     setFile(f);
@@ -90,8 +52,8 @@ function AppInner() {
 
   async function analyze() {
     if (!file) return;
-
     setLoading(true);
+
     try {
       const fd = new FormData();
       fd.append("image", file);
@@ -105,9 +67,28 @@ function AppInner() {
         throw new Error(await r.text());
       }
 
-      const json = await r.json();
+      const raw = await r.text();
 
-      // 🔒 Normalización defensiva
+      let json: any;
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        const cleaned = String(raw)
+          .trim()
+          .replace(/^```[a-zA-Z]*\s*\n/, "")
+          .replace(/\n```$/, "")
+          .trim();
+
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const candidate =
+          start !== -1 && end !== -1 && end > start
+            ? cleaned.slice(start, end + 1)
+            : cleaned;
+
+        json = JSON.parse(candidate);
+      }
+
       const safe: AnalysisResult = {
         has_cartouche: Boolean(json?.has_cartouche),
         cartouche_bbox: json?.cartouche_bbox ?? null,
@@ -174,14 +155,27 @@ function AppInner() {
   return (
     <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
       <h1>Cartouche Reader</h1>
+{!user && (
+  <div style={{ marginBottom: 16 }}>
+    <h2>Iniciar sesión</h2>
+    <button
+      onClick={() =>
+        signIn(
+          prompt("Email") || "",
+          prompt("Contraseña") || ""
+        )
+      }
+    >
+      Entrar
+    </button>
+  </div>
+)}
 
       <input
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={(e) =>
-          e.target.files && onSelectFile(e.target.files[0])
-        }
+        onChange={(e) => e.target.files && onSelectFile(e.target.files[0])}
       />
 
       {imgUrl && (
@@ -243,8 +237,8 @@ function AppInner() {
             <>
               <h3>Candidatos</h3>
               <ul>
-                {result.name_candidates.map((c, _i) => (
-                  <li key={_i}>
+                {result.name_candidates.map((c, i) => (
+                  <li key={i}>
                     {c.name} — {Math.round(c.confidence * 100)}%
                   </li>
                 ))}
@@ -256,8 +250,8 @@ function AppInner() {
             <>
               <h3>Advertencias</h3>
               <ul>
-                {result.warnings.map((w, _i) => (
-                  <li key={_i}>{w}</li>
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
                 ))}
               </ul>
             </>
@@ -265,17 +259,5 @@ function AppInner() {
         </div>
       )}
     </div>
-  );
-}
-
-/* =========================
-   Export final
-========================= */
-
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <AppInner />
-    </ErrorBoundary>
   );
 }
